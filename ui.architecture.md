@@ -31,7 +31,7 @@ import { provide } from '@lit/context';
 import { createContext } from '@lit/context';
 
 export interface ConfigEditorConfig {
-  api: string;
+  client: HttpClient;
   accentColor: string;
   bgColor: string;
 }
@@ -43,7 +43,7 @@ export class ConfigEditorProvider extends LitElement {
   @provide({ context: configEditorContext })
   @property({ type: Object })
   config: ConfigEditorConfig = {
-    api: '',
+    client: new HttpClient(''),
     accentColor: '#3b82f6',
     bgColor: '#ffffff',
   };
@@ -95,16 +95,12 @@ export class ConfigEditor extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    const res = await fetch(`${this.config.api}/configs/${this.configKey}`);
-    this.data = await res.text();
+    this.data = await this.config.client.getText(`/configs/${this.configKey}`);
     this.loading = false;
   }
 
   private async save() {
-    await fetch(`${this.config.api}/configs/${this.configKey}`, {
-      method: 'PUT',
-      body: this.data,
-    });
+    await this.config.client.putJson(`/configs/${this.configKey}`, this.data);
   }
 
   render() {
@@ -136,17 +132,85 @@ Each component has an `index.html` at its package root. This is the development 
   <title>Config Editor Playground</title>
 </head>
 <body>
-  <config-editor-provider config='{"api": "http://localhost:5000", "accentColor": "#3b82f6", "bgColor": "#fff"}'>
+  <config-editor-provider>
     <config-editor config-key="demo-settings"></config-editor>
   </config-editor-provider>
 
-  <script type="module" src="./config-editor.ts"></script>
-  <script type="module" src="./config-editor-provider.ts"></script>
+  <script type="module">
+    import './config-editor.ts';
+    import './config-editor-provider.ts';
+    import { HttpClient } from './http-client.ts';
+
+    const provider = document.querySelector('config-editor-provider');
+    provider.config = {
+      client: new HttpClient('http://localhost:5000'),
+      accentColor: '#3b82f6',
+      bgColor: '#fff',
+    };
+  </script>
 </body>
 </html>
 ```
 
-Run with `npx vite`. The component is fully functional in isolation. No app shell, no router, no other components.
+Run with `npx vite`. The component is fully functional in isolation. No app shell, no router, no other components. The playground creates its own `HttpClient` — no auth hooks needed for local development.
+
+#### HTTP Client
+
+Components need to make API calls. Auth tokens, base URLs, and other request-level concerns are cross-cutting — components shouldn't manage them directly.
+
+The approach: an `HttpClient` class wrapping `ky` (~3KB, built on native `fetch`, supports hooks for auth injection). Each component receives an `HttpClient` instance through its provider. The app shell creates the client with auth configuration; the component just calls `getJson` / `putJson`.
+
+Why `ky`: small, `fetch`-based (not legacy `XMLHttpRequest` like axios), supports before/after hooks (equivalent to C#'s `HttpClientHandler`), actively maintained. If `ky` is ever replaced, only the `HttpClient` internals change — components call the same methods.
+
+```ts
+import ky, { type KyInstance, type Options } from 'ky';
+
+export class HttpClient {
+  private client: KyInstance;
+
+  constructor(baseUrl: string, options?: Options) {
+    this.client = ky.create({ prefixUrl: baseUrl, ...options });
+  }
+
+  get(path: string): Promise<Response> { return this.client.get(path); }
+  getJson<T>(path: string): Promise<T> { return this.client.get(path).json<T>(); }
+  getText(path: string): Promise<string> { return this.client.get(path).text(); }
+  putJson<T>(path: string, body: unknown): Promise<T> { return this.client.put(path, { json: body }).json<T>(); }
+  postJson<T>(path: string, body: unknown): Promise<T> { return this.client.post(path, { json: body }).json<T>(); }
+  delete(path: string): Promise<void> { return this.client.delete(path).then(() => {}); }
+}
+```
+
+The component's provider carries the client instead of a raw API URL:
+
+```ts
+export interface ConfigEditorConfig {
+  client: HttpClient;
+  accentColor: string;
+  bgColor: string;
+}
+```
+
+The component uses it without auth awareness:
+
+```ts
+const data = await this.config.client.getText(`/configs/${this.configKey}`);
+await this.config.client.putJson(`/configs/${this.configKey}`, data);
+```
+
+Auth is injected at the app level when creating the client — components never see tokens:
+
+```ts
+const client = new HttpClient('https://api.confi.app', {
+  hooks: {
+    beforeRequest: [
+      request => request.headers.set('Authorization', `Bearer ${getToken()}`),
+    ],
+  },
+});
+```
+
+In theory, each component could use a different `HttpClient` implementation — as long as it has the same method signatures. The provider is the injection point. You could start with `ky`-based, swap to a custom `fetch` wrapper later, or use a mock client in playgrounds. Components don't change.
 
 #### How a Component Stays Independent
 
@@ -157,6 +221,7 @@ graph TD
     A[config-editor] --> B[lit]
     A --> C[@lit/context]
     A --> D[config-editor-provider]
+    A --> E[HttpClient interface]
     D --> B
     D --> C
 ```
@@ -201,16 +266,11 @@ The app defines global theme values and maps them into each component's provider
   }
 </style>
 
-<config-editor-provider config='{
-  "api": "https://api.confi.app",
-  "accentColor": "var(--brand-primary)",
-  "bgColor": "var(--brand-bg)"
-}'>
-<version-history-provider config='{
-  "api": "https://api.confi.app",
-  "headerColor": "var(--brand-primary)",
-  "dangerColor": "var(--brand-danger)"
-}'>
+<!-- HttpClient is created once in the app setup script with auth hooks -->
+<!-- Then passed into each provider's config object -->
+
+<config-editor-provider>
+<version-history-provider>
 
   <div style="display:grid; grid-template-columns:250px 1fr; height:100vh">
     <aside>
@@ -223,7 +283,28 @@ The app defines global theme values and maps them into each component's provider
 </config-editor-provider>
 ```
 
-Adding a new component means: add its provider to this nesting, map global tokens to its specific props, add a route.
+The providers receive their config objects (including the shared `HttpClient`) from the app's setup script:
+
+```ts
+import { HttpClient } from './http-client.js';
+
+const client = new HttpClient('https://api.confi.app', {
+  hooks: {
+    beforeRequest: [
+      request => request.headers.set('Authorization', `Bearer ${getToken()}`),
+    ],
+  },
+});
+
+const editorProvider = document.querySelector('config-editor-provider');
+editorProvider.config = {
+  client,
+  accentColor: getComputedStyle(document.documentElement).getPropertyValue('--brand-primary'),
+  bgColor: getComputedStyle(document.documentElement).getPropertyValue('--brand-bg'),
+};
+```
+
+Adding a new component means: add its provider to this nesting, map global tokens and the client to its specific props, add a route.
 
 #### Using Momentum Design Components
 
@@ -232,7 +313,7 @@ Momentum components are used directly alongside your own. They share the same te
 ```html
 <mdc-themeprovider themeclass="mds-theme-stable-lightWebex">
   <!-- your providers nest inside -->
-  <config-editor-provider config='...'>
+  <config-editor-provider>
     <!-- Momentum components (mdc-button, mdc-input) pick up the Momentum theme automatically -->
     <!-- Your components pick up config from your providers -->
     <main id="outlet"></main>
@@ -276,7 +357,7 @@ The webview loads the same components. The only differences:
 ```html
 <!-- webview index.html -->
 <link rel="stylesheet" href="${themeUri}">
-<config-editor-provider config='{"api": "https://api.confi.app", "accentColor": "var(--brand-primary)"}'>
+<config-editor-provider>
   <config-editor config-key="${configKey}"></config-editor>
 </config-editor-provider>
 <script type="module" src="${componentsUri}"></script>
