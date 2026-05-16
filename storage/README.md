@@ -29,7 +29,7 @@ However, "Git" doesn't answer a couple of high-level architectural questions abo
 - 🚧 "app as repo" VS "app as folder"
 
 An advantage of git is that it has a "built-in" mechanism for approvals: git branches.
-With "app as repo" approach all [access](../access/README.md) concerns, including [approvals](../access/approvals.md) can be "delegated" to Github, Gitlab, etc with PRs and repository access management. This is presumably how [Sprint Cloud Config](../inspirations/sprint-cloud-config.md) solves it. However, without an ability to automatically create such repos the DX may become tedious.
+With "app as repo" approach all [access](../access/README.md) concerns, including [approvals](../access/approvals.md) can be "delegated" to Github, Gitlab, etc with PRs and repository access management. This is presumably how [Spring Cloud Config](../inspirations/sprint-cloud-config.md) solves it. However, without an ability to automatically create such repos the DX may become tedious.
 
 **Github / Gitlab**:
 
