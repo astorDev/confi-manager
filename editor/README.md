@@ -1,6 +1,6 @@
 # Confi Manager Editor / Editing
 
-Essentially a confi manager editor consist exactly of this components:
+Essentially a confi manager editor consists exactly of these components:
 
 - JSON Editor for configuration value
 - JSON Schema for validating editing of the configuration

@@ -5,7 +5,7 @@ Having that configuration editing is basically validated JSON editing, using VS 
 - Supposedly requires less work
 - An integrated solution can be **more** attractive for developers due to a non-interrupted DX.
 
-The solution can be split into two flows: [CLI-Driven](#cli-driven) and [Extension-drive](#extension-driven)
+The solution can be split into two flows: [CLI-Driven](#cli-driven) and [Extension-driven](#extension-driven)
 
 ## CLI-driven
 

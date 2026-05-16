@@ -13,7 +13,7 @@ Core storage unit of confi manager is JSON: Configuration Value JSON and Schema 
 
 ## BYOS
 
-Both MongoDb and Git will let us use "bring your own storage approach". For example we can let user connect to MongoDb Atlas or Github. With MongoDb the approach is trivial: one server per confi for company or company environment. With Git it's highly dependent on the way we architect the storage itself though and it may be the case, that we need a git allowance that existing doesn't provide or doesn't provide for free (like creating an unlimited number of repositories).
+Both MongoDb and Git will let us use "bring your own storage approach". For example we can let user connect to MongoDb Atlas or Github. With MongoDb the approach is trivial: one server per confi for company or company environment. With Git it's highly dependent on the way we architect the storage itself though and it may be the case, that we need a git allowance that an existing solution doesn't provide or doesn't provide for free (like creating an unlimited number of repositories).
 
 ## WYSIWYG
 
@@ -21,9 +21,9 @@ With Git storage the way we store files will be roughly the same as we represent
 
 ## Git
 
-Git seems to be pretty standard. Supposedly for that reason, [Sprint Cloud Config](../inspirations/sprint-cloud-config.md) architectured they solution around git.
+Git seems to be pretty standard. Supposedly for that reason, [Spring Cloud Config](../inspirations/sprint-cloud-config.md) architectured their solution around git.
 
-However, "Git" doesn't answer a couple of high-level architectural questions about the storage. Here's what still needs to be desided:
+However, "Git" doesn't answer a couple of high-level architectural questions about the storage. Here's what still needs to be decided:
 
 - 🚧 "versions as branches" VS "versions as folders"
 - 🚧 "app as repo" VS "app as folder"
@@ -36,4 +36,4 @@ With "app as repo" approach all [access](../access/README.md) concerns, includin
 - Doesn't limit numbers of repos we can create. 
 - Github API allows creating repos.
 
-However, if using it we no longer purely use "git". Now we use Github or Gitlab API. This can be fine as an integration extension, but definately doesn't classify for the core product.
+However, if using it we no longer purely use "git". Now we use Github or Gitlab API. This can be fine as an integration extension, but definitely doesn't classify for the core product.
